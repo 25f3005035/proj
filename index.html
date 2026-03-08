@@ -37,10 +37,11 @@ Use W A S D to move
 
 <script type="module">
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.159/build/three.module.js";
-import { PointerLockControls } from "https://cdn.jsdelivr.net/npm/three@0.159/examples/jsm/controls/PointerLockControls.js";
-import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.159/examples/jsm/loaders/GLTFLoader.js";
+<script type="module">
 
+import * as THREE from "https://cdn.skypack.dev/three@0.159.0";
+import { PointerLockControls } from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/controls/PointerLockControls.js";
+import { GLTFLoader } from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/loaders/GLTFLoader.js";
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
@@ -95,3 +96,4 @@ animate();
 
 </body>
 </html>
+
