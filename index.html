@@ -37,8 +37,6 @@ Use W A S D to move
 
 <script type="module">
 
-<script type="module">
-
 import * as THREE from "https://cdn.skypack.dev/three@0.159.0";
 import { PointerLockControls } from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/controls/PointerLockControls.js";
 import { GLTFLoader } from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/loaders/GLTFLoader.js";
@@ -53,11 +51,14 @@ window.innerWidth/window.innerHeight,
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 document.body.appendChild(renderer.domElement);
 
 const controls = new PointerLockControls(camera, document.body);
 
-document.getElementById("instructions").onclick = () => controls.lock();
+
+const instructions = document.getElementById("instructions");
+instructions.addEventListener('click', () => controls.lock());
 
 scene.add(controls.getObject());
 
@@ -92,8 +93,19 @@ renderer.render(scene,camera);
 
 animate();
 
+// handle resize
+window.addEventListener('resize', () => {
+	camera.aspect = window.innerWidth / window.innerHeight;
+	camera.updateProjectionMatrix();
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+});
+
+// pointer lock UX
+controls.addEventListener('lock', () => { instructions.style.display = 'none'; });
+controls.addEventListener('unlock', () => { instructions.style.display = 'block'; });
+
 </script>
 
 </body>
 </html>
-
