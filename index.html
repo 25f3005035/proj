@@ -67,6 +67,16 @@
   }
   #loading.hidden { opacity: 0; pointer-events: none; }
 </style>
+
+<!-- Import map — official Three.js recommendation for no-build setups -->
+<script type="importmap">
+{
+  "imports": {
+    "three":        "https://unpkg.com/three@0.159.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -89,9 +99,9 @@
 // ===================================================================
 //  CDN imports — no build tools, works on GitHub Pages / any static host
 // ===================================================================
-import * as THREE from "https://cdn.skypack.dev/three@0.159.0";
-import { PointerLockControls } from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/controls/PointerLockControls.js";
-import { GLTFLoader }          from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/loaders/GLTFLoader.js";
+import * as THREE from "three";
+import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
+import { GLTFLoader }          from "three/addons/loaders/GLTFLoader.js";
 
 // ===================================================================
 //  Tuning constants
