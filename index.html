@@ -1,22 +1,121 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta charset="utf-8">
+<title>Berlin U-Bahn Explorer</title>
+
+<style>
+body {
+margin:0;
+overflow:hidden;
+font-family:sans-serif;
+}
+
 #instructions {
-position: absolute;
-top: 50%;
-left: 50%;
-transform: translate(-50%, -50%);
-color: white;
-background: rgba(0,0,0,0.7);
-padding: 20px 30px;
-border-radius: 8px;
-text-align: center;
-cursor: pointer;
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+color:white;
+background:rgba(0,0,0,0.7);
+padding:20px 30px;
+border-radius:8px;
+text-align:center;
+cursor:pointer;
 }
 
 #instructions h1 {
-margin: 0 0 10px 0;
-font-size: 22px;
+margin:0 0 10px 0;
+font-size:22px;
 }
 
 #instructions p {
-margin: 5px 0;
-font-size: 14px;
-}\
+margin:5px 0;
+font-size:14px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div id="instructions">
+<h1>Click to Start</h1>
+<p>W A S D to move</p>
+</div>
+
+<script type="module">
+
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.159/build/three.module.js";
+import { PointerLockControls } from "https://cdn.jsdelivr.net/npm/three@0.159/examples/jsm/controls/PointerLockControls.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.159/examples/jsm/loaders/GLTFLoader.js";
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+75,
+window.innerWidth/window.innerHeight,
+0.1,
+1000
+);
+
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth,window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new PointerLockControls(camera, document.body);
+
+const instructions = document.getElementById("instructions");
+
+instructions.addEventListener("click", ()=>controls.lock());
+
+controls.addEventListener("lock", ()=>{
+instructions.style.display="none";
+});
+
+controls.addEventListener("unlock", ()=>{
+instructions.style.display="";
+});
+
+scene.add(controls.getObject());
+
+const light = new THREE.HemisphereLight(0xffffff,0x444444);
+scene.add(light);
+
+const loader = new GLTFLoader();
+
+loader.load("station.glb",(gltf)=>{
+scene.add(gltf.scene);
+});
+
+camera.position.y = 1.7;
+
+const velocity = new THREE.Vector3();
+
+document.addEventListener("keydown",(e)=>{
+if(e.code==="KeyW") velocity.z=-0.1;
+if(e.code==="KeyS") velocity.z=0.1;
+if(e.code==="KeyA") velocity.x=-0.1;
+if(e.code==="KeyD") velocity.x=0.1;
+});
+
+document.addEventListener("keyup",()=>{
+velocity.set(0,0,0);
+});
+
+function animate(){
+requestAnimationFrame(animate);
+
+controls.moveRight(velocity.x);
+controls.moveForward(velocity.z);
+
+renderer.render(scene,camera);
+}
+
+animate();
+
+</script>
+
+</body>
+</html>
