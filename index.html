@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Berlin U-Bahn Explorer</title>
+<meta charset="UTF-8">
+<title>U-Bahn Explorer</title>
 
 <style>
 body {
 margin:0;
 overflow:hidden;
-font-family:sans-serif;
+background:black;
 }
 
 #instructions {
@@ -24,16 +24,6 @@ border-radius:8px;
 text-align:center;
 cursor:pointer;
 }
-
-#instructions h1 {
-margin:0 0 10px 0;
-font-size:22px;
-}
-
-#instructions p {
-margin:5px 0;
-font-size:14px;
-}
 </style>
 
 </head>
@@ -41,8 +31,8 @@ font-size:14px;
 <body>
 
 <div id="instructions">
-<h1>Click to Start</h1>
-<p>W A S D to move</p>
+Click to Start<br>
+Use W A S D to move
 </div>
 
 <script type="module">
@@ -66,17 +56,7 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new PointerLockControls(camera, document.body);
 
-const instructions = document.getElementById("instructions");
-
-instructions.addEventListener("click", ()=>controls.lock());
-
-controls.addEventListener("lock", ()=>{
-instructions.style.display="none";
-});
-
-controls.addEventListener("unlock", ()=>{
-instructions.style.display="";
-});
+document.getElementById("instructions").onclick = () => controls.lock();
 
 scene.add(controls.getObject());
 
@@ -85,7 +65,7 @@ scene.add(light);
 
 const loader = new GLTFLoader();
 
-loader.load("station.glb",(gltf)=>{
+loader.load("station.glb", function(gltf){
 scene.add(gltf.scene);
 });
 
@@ -100,16 +80,12 @@ if(e.code==="KeyA") velocity.x=-0.1;
 if(e.code==="KeyD") velocity.x=0.1;
 });
 
-document.addEventListener("keyup",()=>{
-velocity.set(0,0,0);
-});
+document.addEventListener("keyup",()=>velocity.set(0,0,0));
 
 function animate(){
 requestAnimationFrame(animate);
-
 controls.moveRight(velocity.x);
 controls.moveForward(velocity.z);
-
 renderer.render(scene,camera);
 }
 
