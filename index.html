@@ -1,111 +1,374 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>U-Bahn Explorer</title>
-
 <style>
-body {
-margin:0;
-overflow:hidden;
-background:black;
-}
+  *    { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #000; }
+  canvas { display: block; }
 
-#instructions {
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-color:white;
-background:rgba(0,0,0,0.7);
-padding:20px 30px;
-border-radius:8px;
-text-align:center;
-cursor:pointer;
-}
+  /* ---- start overlay --------------------------------------------------- */
+  #overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.7);
+    z-index: 10;
+    cursor: pointer;
+    transition: opacity 0.35s ease;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+
+  #overlay .card {
+    color: #fff;
+    text-align: center;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    user-select: none;
+  }
+  #overlay .card h1 {
+    font-size: 2.2rem;
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.06em;
+  }
+  #overlay .card p {
+    font-size: 1rem;
+    opacity: 0.7;
+    line-height: 1.6;
+  }
+  #overlay .card .keys {
+    margin-top: 1rem;
+    display: flex; gap: 6px; justify-content: center;
+  }
+  #overlay .card .keys span {
+    display: inline-block;
+    width: 38px; height: 38px;
+    line-height: 38px;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  #overlay .card .sub {
+    margin-top: 0.8rem;
+    font-size: 0.85rem;
+    opacity: 0.5;
+  }
+
+  /* ---- loading bar ----------------------------------------------------- */
+  #loading {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    color: #999;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 0.85rem;
+    z-index: 20;
+    transition: opacity 0.5s ease;
+  }
+  #loading.hidden { opacity: 0; pointer-events: none; }
 </style>
-
 </head>
-
 <body>
 
-<div id="instructions">
-Click to Start<br>
-Use W A S D to move
+<!-- Instruction overlay -->
+<div id="overlay">
+  <div class="card">
+    <h1>U-Bahn Explorer</h1>
+    <p>Click to Start</p>
+    <div class="keys">
+      <span>W</span><span>A</span><span>S</span><span>D</span>
+    </div>
+    <p class="sub">W A S D to move &middot; Mouse to look &middot; ESC to pause</p>
+  </div>
 </div>
 
-<script type="module">
+<!-- Loading indicator -->
+<div id="loading">Loading station&hellip;</div>
 
+<script type="module">
+// ===================================================================
+//  CDN imports — no build tools, works on GitHub Pages / any static host
+// ===================================================================
 import * as THREE from "https://cdn.skypack.dev/three@0.159.0";
 import { PointerLockControls } from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/controls/PointerLockControls.js";
-import { GLTFLoader } from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFLoader }          from "https://cdn.skypack.dev/three@0.159.0/examples/jsm/loaders/GLTFLoader.js";
+
+// ===================================================================
+//  Tuning constants
+// ===================================================================
+const PLAYER_HEIGHT = 1.7;          // eye-level (metres)
+const PLAYER_RADIUS = 0.3;          // bounding-sphere radius
+const MOVE_SPEED    = 4.5;          // max walk speed (m/s)
+const ACCEL         = 28.0;         // acceleration factor
+const DAMPING       = 10.0;         // velocity decay when no input
+const GRAVITY       = -20.0;        // gravity (m/s²)
+const GROUND_Y      = 0.0;          // ground plane Y
+const BOB_FREQ      = 10.0;         // head-bob frequency (Hz)
+const BOB_AMP_Y     = 0.035;        // vertical bob amplitude
+const BOB_AMP_X     = 0.015;        // lateral bob amplitude
+
+// ===================================================================
+//  Scene, camera, renderer
+// ===================================================================
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e0e0e);
+scene.fog = new THREE.Fog(0x0e0e0e, 25, 90);
 
 const camera = new THREE.PerspectiveCamera(
-75,
-window.innerWidth/window.innerHeight,
-0.1,
-1000
+  72, window.innerWidth / window.innerHeight, 0.05, 250
 );
+camera.position.set(0, PLAYER_HEIGHT, 0);
 
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth,window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
-const controls = new PointerLockControls(camera, document.body);
+// ===================================================================
+//  Lighting
+// ===================================================================
+scene.add(new THREE.HemisphereLight(0xffeedd, 0x333344, 0.9));
 
+const sun = new THREE.DirectionalLight(0xffffff, 0.5);
+sun.position.set(5, 12, 8);
+scene.add(sun);
 
-const instructions = document.getElementById("instructions");
-instructions.addEventListener('click', () => controls.lock());
-
-scene.add(controls.getObject());
-
-const light = new THREE.HemisphereLight(0xffffff,0x444444);
-scene.add(light);
-
-const loader = new GLTFLoader();
-
-loader.load("station.glb", function(gltf){
-scene.add(gltf.scene);
-});
-
-camera.position.y = 1.7;
-
-const velocity = new THREE.Vector3();
-
-document.addEventListener("keydown",(e)=>{
-if(e.code==="KeyW") velocity.z=-0.1;
-if(e.code==="KeyS") velocity.z=0.1;
-if(e.code==="KeyA") velocity.x=-0.1;
-if(e.code==="KeyD") velocity.x=0.1;
-});
-
-document.addEventListener("keyup",()=>velocity.set(0,0,0));
-
-function animate(){
-requestAnimationFrame(animate);
-controls.moveRight(velocity.x);
-controls.moveForward(velocity.z);
-renderer.render(scene,camera);
+// Warm station ceiling lights
+for (const z of [-10, 0, 10, 20]) {
+  const pl = new THREE.PointLight(0xffcc77, 1.2, 20, 2);
+  pl.position.set(0, 4.2, z);
+  scene.add(pl);
 }
 
-animate();
+// ===================================================================
+//  Pointer-lock controls + overlay
+// ===================================================================
+const controls  = new PointerLockControls(camera, document.body);
+const playerObj = controls.getObject();          // camera rig
+scene.add(playerObj);
 
-// handle resize
-window.addEventListener('resize', () => {
-	camera.aspect = window.innerWidth / window.innerHeight;
-	camera.updateProjectionMatrix();
-	renderer.setSize(window.innerWidth, window.innerHeight);
-	renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const overlay   = document.getElementById("overlay");
+const loadingEl = document.getElementById("loading");
+
+overlay.addEventListener("click", () => controls.lock());
+controls.addEventListener("lock",   () => overlay.classList.add("hidden"));
+controls.addEventListener("unlock", () => overlay.classList.remove("hidden"));
+
+// ===================================================================
+//  Load GLB model & build Box3 colliders
+// ===================================================================
+const colliderBoxes = [];           // Array<{ box: THREE.Box3, mesh: THREE.Mesh }>
+
+const loader = new GLTFLoader();
+loader.load(
+  "station.glb",
+  (gltf) => {
+    const model = gltf.scene;
+    scene.add(model);
+
+    model.traverse((child) => {
+      if (!child.isMesh) return;
+
+      // Compute a world-space AABB for each mesh
+      child.geometry.computeBoundingBox();
+      const box = new THREE.Box3().setFromObject(child);
+
+      // Only use meshes whose AABB is meaningful (skip tiny decorations)
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      if (size.x > 0.15 && size.y > 0.15 && size.z > 0.15) {
+        colliderBoxes.push({ box, mesh: child });
+      }
+    });
+
+    loadingEl.classList.add("hidden");
+  },
+  (xhr) => {
+    if (xhr.total) {
+      const pct = Math.round((xhr.loaded / xhr.total) * 100);
+      loadingEl.textContent = `Loading station\u2026 ${pct}%`;
+    }
+  },
+  (err) => {
+    console.error("GLB load error:", err);
+    loadingEl.textContent = "Failed to load station.glb";
+  }
+);
+
+// ===================================================================
+//  Input
+// ===================================================================
+const input = { w: false, a: false, s: false, d: false };
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === "KeyW") input.w = true;
+  if (e.code === "KeyS") input.s = true;
+  if (e.code === "KeyA") input.a = true;
+  if (e.code === "KeyD") input.d = true;
+});
+document.addEventListener("keyup", (e) => {
+  if (e.code === "KeyW") input.w = false;
+  if (e.code === "KeyS") input.s = false;
+  if (e.code === "KeyA") input.a = false;
+  if (e.code === "KeyD") input.d = false;
 });
 
-// pointer lock UX
-controls.addEventListener('lock', () => { instructions.style.display = 'none'; });
-controls.addEventListener('unlock', () => { instructions.style.display = 'block'; });
+// ===================================================================
+//  Collision helper — Box3 vs player bounding sphere
+// ===================================================================
+const _playerSphere = new THREE.Sphere(new THREE.Vector3(), PLAYER_RADIUS);
+const _testPos      = new THREE.Vector3();
+const _closestPt    = new THREE.Vector3();
 
+/**
+ * Check if a sphere at `center` with PLAYER_RADIUS intersects any collider.
+ * Returns a push-back vector to resolve the deepest penetration, or null.
+ */
+function resolveCollisions(center) {
+  let pushX = 0;
+  let pushZ = 0;
+
+  _playerSphere.center.copy(center);
+  _playerSphere.center.y = GROUND_Y + PLAYER_HEIGHT * 0.5;  // test at torso height
+
+  for (let i = 0, n = colliderBoxes.length; i < n; i++) {
+    const { box } = colliderBoxes[i];
+
+    // Closest point on AABB to sphere centre
+    box.clampPoint(_playerSphere.center, _closestPt);
+    const distSq = _playerSphere.center.distanceToSquared(_closestPt);
+
+    if (distSq < PLAYER_RADIUS * PLAYER_RADIUS) {
+      // Penetration detected — push sphere out
+      const dist = Math.sqrt(distSq) || 0.0001;
+      const overlap = PLAYER_RADIUS - dist;
+
+      const nx = (_playerSphere.center.x - _closestPt.x) / dist;
+      const nz = (_playerSphere.center.z - _closestPt.z) / dist;
+
+      pushX += nx * overlap;
+      pushZ += nz * overlap;
+    }
+  }
+
+  if (pushX !== 0 || pushZ !== 0) {
+    return { x: pushX, z: pushZ };
+  }
+  return null;
+}
+
+// ===================================================================
+//  Physics state
+// ===================================================================
+const velocity  = new THREE.Vector3();   // world-space walk velocity (x,z) + vertical (y)
+const direction = new THREE.Vector3();   // desired move direction (local)
+
+let isGrounded = true;
+let bobTimer   = 0;
+
+// ===================================================================
+//  Main loop
+// ===================================================================
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);  // cap to prevent spiral of death
+
+  if (controls.isLocked) {
+    // --- build wish direction (camera-local) ---
+    direction.set(0, 0, 0);
+    if (input.w) direction.z -= 1;
+    if (input.s) direction.z += 1;
+    if (input.a) direction.x -= 1;
+    if (input.d) direction.x += 1;
+    const hasInput = direction.lengthSq() > 0;
+    if (hasInput) direction.normalize();
+
+    // --- convert to world-space ---
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    const right = new THREE.Vector3();
+    right.crossVectors(forward, camera.up).normalize();
+
+    const wishX = right.x * direction.x + forward.x * (-direction.z);
+    const wishZ = right.z * direction.x + forward.z * (-direction.z);
+
+    // --- accelerate / decelerate with inertia ---
+    if (hasInput) {
+      velocity.x += (wishX * MOVE_SPEED - velocity.x) * ACCEL * dt;
+      velocity.z += (wishZ * MOVE_SPEED - velocity.z) * ACCEL * dt;
+    } else {
+      velocity.x += (0 - velocity.x) * DAMPING * dt;
+      velocity.z += (0 - velocity.z) * DAMPING * dt;
+      // Snap to zero when very slow to avoid drifting
+      if (Math.abs(velocity.x) < 0.01) velocity.x = 0;
+      if (Math.abs(velocity.z) < 0.01) velocity.z = 0;
+    }
+
+    // --- gravity ---
+    velocity.y += GRAVITY * dt;
+
+    // --- integrate position ---
+    const pos = playerObj.position;
+    pos.x += velocity.x * dt;
+    pos.z += velocity.z * dt;
+    pos.y += velocity.y * dt;
+
+    // --- ground clamp ---
+    const groundLevel = GROUND_Y + PLAYER_HEIGHT;
+    if (pos.y <= groundLevel) {
+      pos.y = groundLevel;
+      velocity.y = 0;
+      isGrounded = true;
+    } else {
+      isGrounded = false;
+    }
+
+    // --- Box3 collision resolution ---
+    const push = resolveCollisions(pos);
+    if (push) {
+      pos.x += push.x;
+      pos.z += push.z;
+      // Zero-out velocity along push direction to prevent jitter
+      if (Math.abs(push.x) > 0.001) velocity.x = 0;
+      if (Math.abs(push.z) > 0.001) velocity.z = 0;
+    }
+
+    // --- head bob ---
+    const hSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+    if (hSpeed > 0.4 && isGrounded) {
+      bobTimer += dt * BOB_FREQ;
+      const factor = Math.min(hSpeed / MOVE_SPEED, 1.0);
+      camera.position.y = Math.sin(bobTimer)       * BOB_AMP_Y * factor;
+      camera.position.x = Math.cos(bobTimer * 0.5) * BOB_AMP_X * factor;
+    } else {
+      // Smoothly return to neutral
+      camera.position.y += (0 - camera.position.y) * 6 * dt;
+      camera.position.x += (0 - camera.position.x) * 6 * dt;
+      if (hSpeed < 0.2) bobTimer = 0;
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+// ===================================================================
+//  Resize handler
+// ===================================================================
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+});
 </script>
-
 </body>
 </html>
